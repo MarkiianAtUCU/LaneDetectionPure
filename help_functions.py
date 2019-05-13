@@ -2,7 +2,46 @@ import math
 
 import cv2
 import numpy as np
-from scipy import optimize
+from scipy import optimize, interp
+
+old = 0.75
+new = 0.25
+
+
+class Interpolator_ARR:
+    def __init__(self, thresh):
+        self.prev_x = []
+        self.threshold = thresh
+    def compare(self, x):
+        if not self.prev_x:
+            self.prev_x = x
+            return x
+        for i in range(len(x)):
+            if (self.prev_x[i] - x[i])**2 > self.threshold:
+                self.prev_x[i] = self.prev_x[i]*old + x[i]*new
+            else:
+                self.prev_x[i] = x[i]
+        return x
+
+class Interpolator:
+    def __init__(self, thresh, max_th = 9999999999):
+        self.prev_x = None
+        self.threshold = thresh
+        self.max_th = max_th
+    def compare(self, x):
+        if not self.prev_x:
+            self.prev_x = x
+            return x
+
+        if (self.prev_x - x)**2 > self.threshold:
+            self.prev_x = self.prev_x*old + x*new
+            return self.prev_x*old + x*new
+
+        if (self.prev_x - x)**2 > self.max_th:
+            return self.prev_x
+
+        self.prev_x = x
+        return x
 
 class Delta:
     def __init__(self, capacity):
@@ -185,6 +224,7 @@ def point_complement(l, r):
             if width > 100:
                 ln += 1
                 mid += width
+
     res = mid // ln
 
     out_l = []
@@ -252,15 +292,25 @@ def fit_line(x,y):
     A, B = optimize.curve_fit(f, x, y)[0]
     return A, B
 
+def fit_polynom(x,y):
+    z_1 = np.polyfit(y, x, 2)
+    f_1 = np.poly1d(z_1)
+    return f_1
+
 def get_best_fit(l):
     x = np.array(list(map(lambda x: x[0], l)))
     y = np.array(list(map(lambda x: x[1], l)))
     circle = fit_circle(x, y)
     line = fit_line(x, y)
+    polynom = fit_polynom(x, y)
 
-    err_line = 0
+    # err_line = 0
+    # for i in range(len(x)):
+    #     err_line += (y[i] - (line[0]*x[i] + line[1]))**2
+
+    err_polynom = 0
     for i in range(len(x)):
-        err_line += (y[i] - (line[0]*x[i] + line[1]))**2
+        err_polynom += (x[i] - polynom(y[i]))**2
 
     err_circle = 0
     a = circle[0][0]
@@ -274,9 +324,11 @@ def get_best_fit(l):
         err_two = (y[i]-y_new_two)**2
         err_circle += err_one if err_one<err_two else err_two
 
-    if err_circle < err_line-1500:
+    print(err_circle, err_polynom)
+    if err_circle < err_polynom-800:
         return circle, True
-    return line, False
+    print("poly")
+    return polynom, False
 
     # print(f"circle = {err_circle} line = {err_line} RES: {'circle' if err_circle<err_line else 'line'}")
 

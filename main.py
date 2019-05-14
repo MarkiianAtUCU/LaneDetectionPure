@@ -1,7 +1,7 @@
 from pipeline import *
 
 
-cap = cv2.VideoCapture("Test_video2.mp4")
+cap = cv2.VideoCapture("Test_video.mp4")
 fr = 25
 count = 0
 
@@ -11,19 +11,21 @@ LINE_WIDTH = 25
 _, frame_0 = cap.read()
 pts = np.float32([(580, 450), (705, 450), (200, 650), (1160, 650)])
 
-# pts_python = [ (1000, 420), (550, 420),(0, 650), (5000, 650)]
+pts_python = [ (700, 435), (560, 435),(0, 650), (3200, 650)]
 
 # for i in range(4):
 
 # cv2.polylines(frame_0, [np.int32(pts_python)], 1, (140,255,0), 3)
+mask = np.full((frame_0.shape[0], frame_0.shape[1]), 0, dtype=np.uint8)
+cv2.fillPoly(mask, [np.int32(pts_python)], 255)
+
 # for i in range(4):
 #     cv2.circle(frame_0, pts_python[i], 5, (0,0,255), 10)
 #     cv2.putText(frame_0, f"{i}", (pts_python[i][0]+20, pts_python[i][1]-10), cv2.FONT_HERSHEY_SIMPLEX, 2, (140,255,140))
 # cv2.imshow("image", frame_0)
 # while(1):
-
-    # if cv2.waitKey(25) & 0xFF == ord('s'):
-    #     exit(100)
+#     if cv2.waitKey(25) & 0xFF == ord('s'):
+#         exit(100)
     #     break
 # pts = np.float32(pts_python)
 cars_cascade = cv2.CascadeClassifier("cars_cascade_3.xml")
@@ -31,7 +33,7 @@ cars_cascade = cv2.CascadeClassifier("cars_cascade_3.xml")
 # tracker = cv2.TrackerMOSSE_create()
 
 # blank_image = np.zeros((500,2000,3), np.uint8)
-# initBB = None
+initBB = None
 inter_R = Interpolator(200)
 inter_X = Interpolator(300)
 inter_Y = Interpolator(300)
@@ -44,9 +46,51 @@ inter_B = Interpolator(5)
 
 left = Interpolator_ARR(10)
 right = Interpolator_ARR(10)
+delta2 = Delta(2)
+
+car_img = None
+FH = FeatureHolder()
 while cap.isOpened():
     count += 1
     ret, frame = cap.read()
+
+
+    # roi = frame[430:650, 640:1279]
+    # cv2.imshow("ROI", cv2.cvtColor(roi, cv2.COLOR_RGB2HSV).astype(np.float)[:, :, 1].astype(np.uint8))
+
+    delt = delta2.add(cv2.cvtColor(frame, cv2.COLOR_RGB2HSV).astype(np.float)[:, :, 1].astype(np.uint8))
+
+    thr = cv2.threshold(delt, 200, 255, cv2.THRESH_BINARY)[1]
+    thr = cv2.bitwise_or(thr, thr, mask=mask)
+    kernel = np.ones((4, 4), np.uint8)
+    img_dilated = cv2.dilate(thr, kernel, iterations=4)
+    cv2.imshow("DIL", img_dilated)
+    _,contours,_ = cv2.findContours(img_dilated, 1, 2)
+    if contours :
+        for cnt in contours:
+            x, y, w, h = cv2.boundingRect(cnt)
+
+            if 4000 < w*h < 30000:
+                print(f"area = {w * h}")
+                initBB = (x,y-80, w, h)
+                # tracker.init(frame, initBB)
+                car_img = frame[y-80 :y+h, x:x+w].copy()
+                cv2.rectangle(frame, (x,y-80), (x + w, y + h), (0, 255, 0), 2)
+                cv2.circle(frame, (x+w//2, y+(h-80)//2), 5, (255,0,0),10)
+            # print("!")
+
+    if car_img is not None:
+        cv2.imshow("CAR", car_img)
+        print(FH.check(car_img))
+        gray = cv2.cvtColor(car_img, cv2.COLOR_BGR2GRAY)
+        cars = cars_cascade.detectMultiScale(gray, 1.1, 0, 0 | cv2.CASCADE_SCALE_IMAGE, (30, 30))
+        # if len(cars) > 0:
+        #     print("CAR")
+        #
+        # for (x, y, w, h) in cars:
+        #     cv2.rectangle(roi, (x, y), (x + w, y + h), (0, 255, 255), 2)
+    # cv2.imshow("delta_ROI", thr)
+    # roi = frame[720:]
     # key = cv2.waitKey(1) & 0xFF
     # if key == ord("s"):
     #     # select the bounding box of the object we want to track (make
@@ -58,6 +102,7 @@ while cap.isOpened():
     #     # coordinates, then start the FPS throughput estimator as well
     #     tracker.init(frame, initBB)
     # if initBB is not None:
+    #     print("!")
     #     # grab the new bounding box coordinates of the object
     #     (success, box) = tracker.update(frame)
     #
@@ -68,12 +113,12 @@ while cap.isOpened():
     #                       (0, 255, 0), 2)
     if ret:
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        cars = cars_cascade.detectMultiScale(gray, 1.1, 5, 0 | cv2.CASCADE_SCALE_IMAGE, (30, 30))
-
-        for (x, y, w, h) in cars:
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 255), 2)
+        # gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        #
+        # cars = cars_cascade.detectMultiScale(roi, 1.1, 5, 0 | cv2.CASCADE_SCALE_IMAGE, (30, 30))
+        #
+        # for (x, y, w, h) in cars:
+        #     cv2.rectangle(roi, (x, y), (x + w, y + h), (0, 255, 255), 2)
 
 
 

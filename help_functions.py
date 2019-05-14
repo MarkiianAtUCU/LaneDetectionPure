@@ -7,6 +7,46 @@ from scipy import optimize, interp
 old = 0.9
 new = 0.1
 
+class FeatureContainer:
+    def __init__(self, lifetime):
+        self.lifetime = lifetime
+        self.container = []
+
+    def check_and_add(selfs, img):
+
+class FeatureHolder:
+    def __init__(self):
+        self.features = None
+        self.sift = cv2.cv2.xfeatures2d.SIFT_create()
+        FLANN_INDEX_KDTREE = 0
+        index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
+        search_params = dict(checks=50)
+
+        self.flann = cv2.FlannBasedMatcher(index_params, search_params)
+
+
+    def check(self, new_img):
+        if self.features is None:
+            self.features = self.sift.detectAndCompute(new_img,None)[1]
+            return True
+
+        new_img_features = self.sift.detectAndCompute(new_img,None)[1]
+        matches = self.flann.knnMatch(self.features, new_img_features, k=2)
+        good = []
+        for m, n in matches:
+            if m.distance < 0.7 * n.distance:
+                good.append(m)
+        if len(good) > 6 :
+            self.features = new_img_features
+            return True
+        return False
+        # else:
+            # print
+            # "Not enough matches are found - %d/%d" % (len(good), MIN_MATCH_COUNT)
+            # matchesMask = None
+
+
+
 
 class Interpolator_ARR:
     def __init__(self, thresh):

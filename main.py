@@ -1,18 +1,19 @@
 from pipeline import *
 
-
 cap = cv2.VideoCapture("Test_video.mp4")
-fr = 25
-count = 0
+# fr = 25
+# count = 0
 
-fourcc = cv2.VideoWriter_fourcc(*'XVID')
-out = cv2.VideoWriter('output.avi', fourcc, 25.0, (1280, 720))
+# fourcc = cv2.VideoWriter_fourcc(*'XVID')
+# out = cv2.VideoWriter('output.avi', fourcc, 25.0, (1280, 720))
 LINE_WIDTH = 25
-_, frame_0 = cap.read()
+# _, frame_0 = cap.read()
 pts = np.float32([(580, 450), (705, 450), (200, 650), (1160, 650)])
-
 pts_python = [ (700, 435), (560, 435),(0, 650), (3200, 650)]
+pts2 = np.float32([[0, 0], [500, 0], [0, 500], [500, 500]])
+M = cv2.getPerspectiveTransform(pts, pts2)
 
+# print(cv2.perspectiveTransform(np.array([(0, 0,1), (2, 0,1)]), M))
 # for i in range(4):
 
 # cv2.polylines(frame_0, [np.int32(pts_python)], 1, (140,255,0), 3)
@@ -28,7 +29,7 @@ cv2.fillPoly(mask, [np.int32(pts_python)], 255)
 #         exit(100)
     #     break
 # pts = np.float32(pts_python)
-cars_cascade = cv2.CascadeClassifier("cars_cascade_3.xml")
+
 
 # tracker = cv2.TrackerMOSSE_create()
 
@@ -49,16 +50,16 @@ right = Interpolator_ARR(10)
 delta2 = Delta(2)
 
 car_img = None
-FH = FeatureHolder()
+FH = FeatureContainer(5, 50)
+cap.set(1, 100)
 while cap.isOpened():
     count += 1
+    print(f"[{count}]")
     ret, frame = cap.read()
-
-
-    # roi = frame[430:650, 640:1279]
-    # cv2.imshow("ROI", cv2.cvtColor(roi, cv2.COLOR_RGB2HSV).astype(np.float)[:, :, 1].astype(np.uint8))
-
-    delt = delta2.add(cv2.cvtColor(frame, cv2.COLOR_RGB2HSV).astype(np.float)[:, :, 1].astype(np.uint8))
+    try:
+        delt = delta2.add(cv2.cvtColor(frame, cv2.COLOR_RGB2HSV).astype(np.float)[:, :, 1].astype(np.uint8))
+    except:
+        delt = delt
 
     thr = cv2.threshold(delt, 200, 255, cv2.THRESH_BINARY)[1]
     thr = cv2.bitwise_or(thr, thr, mask=mask)
@@ -72,18 +73,15 @@ while cap.isOpened():
 
             if 4000 < w*h < 30000:
                 print(f"area = {w * h}")
-                initBB = (x,y-80, w, h)
+                # initBB = (x,y-80, w*2, h*2)
                 # tracker.init(frame, initBB)
                 car_img = frame[y-80 :y+h, x:x+w].copy()
-                cv2.rectangle(frame, (x,y-80), (x + w, y + h), (0, 255, 0), 2)
-                cv2.circle(frame, (x+w//2, y+(h-80)//2), 5, (255,0,0),10)
+                FH.check_and_add(car_img, (x,y-80, w, h+80), frame)
+                # cv2.rectangle(frame, (x,y-80), (x + w, y + h), (0, 255, 0), 2)
+                # cv2.circle(frame, (x+w//2, y+(h-80)//2), 5, (255,0,0),10)
             # print("!")
 
-    if car_img is not None:
-        cv2.imshow("CAR", car_img)
-        print(FH.check(car_img))
-        gray = cv2.cvtColor(car_img, cv2.COLOR_BGR2GRAY)
-        cars = cars_cascade.detectMultiScale(gray, 1.1, 0, 0 | cv2.CASCADE_SCALE_IMAGE, (30, 30))
+
         # if len(cars) > 0:
         #     print("CAR")
         #
@@ -101,16 +99,32 @@ while cap.isOpened():
     #     # start OpenCV object tracker using the supplied bounding box
     #     # coordinates, then start the FPS throughput estimator as well
     #     tracker.init(frame, initBB)
-    # if initBB is not None:
-    #     print("!")
-    #     # grab the new bounding box coordinates of the object
-    #     (success, box) = tracker.update(frame)
-    #
-    #     # check to see if the tracking was a success
-    #     if success:
-    #         (x, y, w, h) = [int(v) for v in box]
-    #         cv2.rectangle(frame, (x, y), (x + w, y + h),
-    #                       (0, 255, 0), 2)
+
+    for (success, box) in FH.get_all_trackers(frame):
+        if success:
+            (x, y, w, h) = [int(v) for v in box]
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (x, y), (x + w, y + h), (0, 0, 255), -1)  # A filled rectangle
+            alpha = 0.4  # Transparency factor.
+
+            image_new = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
+
+            cv2.rectangle(image_new, (x, y), (x + w, y + h),
+                          (0, 0, 255), 2)
+            # cv2.line(image_new, (640, 720), (x+w//2, y+h//2), (255,0,0),5)
+
+            def convert(x, y):
+                return int((M[0][0] * x + M[0][1] * y + M[0][2]) / (M[2][0] * x + M[2][1] * y + M[2][2])), int((
+                            M[1][0] * x + M[1][1] * y + M[1][2]) / (M[2][0] * x + M[2][1] * y + M[2][2]))
+
+            dist = np.linalg.norm((convert(640, 720), convert(x+w//2, y+h//2)))
+
+            cv2.putText(image_new, "{0:.1f}m".format(dist/100), (x+2, y+h), cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,255), 2)
+            cv2.imshow("RES", image_new)
+
+
+            # cv2.line(processed_img,convert(640, 720), convert(x + w, y + h), (0,255,0),5)
+            # print())
     if ret:
 
         # gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
@@ -174,7 +188,7 @@ while cap.isOpened():
         # for i in r_points:
         #     if i[0]:
         #         cv2.circle(processed_img, i, 10, (0, 0, 255), -1)
-
+        # cv2.line(processed_img, (408, 409), (613, 615), (255,0,0), 5)
         cv2.imshow("FinalRes", processed_img)
         # back = transform_perspective_back(mask, pts)
         # b_channel, g_channel, r_channel = cv2.split(frame)

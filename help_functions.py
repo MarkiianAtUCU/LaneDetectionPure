@@ -6,13 +6,103 @@ from scipy import optimize, interp
 
 old = 0.9
 new = 0.1
+cars_cascade = cv2.CascadeClassifier("cars_cascade_3.xml")
 
 class FeatureContainer:
-    def __init__(self, lifetime):
+    def __init__(self, lifetime, acquire):
         self.lifetime = lifetime
         self.container = []
+        self.boundaries = []
+        self.lifetime_container = []
+        self.trackers = []
+        self.acquire_count = []
+        self.sift = cv2.cv2.xfeatures2d.SIFT_create()
+        FLANN_INDEX_KDTREE = 0
+        index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
+        search_params = dict(checks=50)
+        self.flann = cv2.FlannBasedMatcher(index_params, search_params)
+        self.acquire = acquire
 
-    def check_and_add(selfs, img):
+    def check_and_add(self, img, pts, frame):
+        for i in range(len(self.acquire_count)):
+            if self.acquire_count[i] > self.acquire:
+                print("ACC")
+                self.acquire_count[i] = 1
+                self.trackers[i].clear()
+                self.trackers[i] = cv2.TrackerMOSSE_create()
+                self.trackers[i].init(frame, pts)
+
+        flag = 0
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        cars = cars_cascade.detectMultiScale(gray, 1.1, 0, 0 | cv2.CASCADE_SCALE_IMAGE, (30, 30))
+        if len(cars) > 7:
+            flag = -999999999999999
+
+        if not self.container:
+            self.container.append(self.sift.detectAndCompute(img, None)[1])
+            self.boundaries.append(pts)
+            self.lifetime_container.append(flag)
+            self.trackers.append(cv2.TrackerMOSSE_create())
+            self.trackers[-1].init(frame, pts)
+            self.acquire_count.append(1)
+
+            # return self.trackers[-1].update(frame)
+
+        new_img = self.sift.detectAndCompute(img, None)[1]
+
+        for i in range(len(self.container)):
+            if self.get_rank(self.container[i], new_img) > 6:
+                self.container[i] = new_img
+                self.lifetime_container[i] = flag if flag!=0 else 0
+                self.acquire_count[i]+=1
+                return
+
+                # return self.trackers[i].update(frame)
+
+        self.container.append(self.sift.detectAndCompute(img, None)[1])
+        self.boundaries.append(pts)
+        self.lifetime_container.append(flag)
+        self.acquire_count.append(1)
+        self.trackers.append(cv2.TrackerMOSSE_create())
+        self.trackers[-1].init(frame, pts)
+
+        # return self.trackers[-1].update(frame)
+    def get_all_trackers(self, frame):
+        # print(self.acquire_count)
+
+        to_del = []
+        for i in range(len(self.lifetime_container)):
+            self.lifetime_container[i] += 1
+            if self.lifetime_container[i] > self.lifetime:
+                to_del.append(i)
+
+        # for i in to_del:
+
+            # del self.lifetime_container[i]
+            # del self.boundaries[i]
+            # del self.container[i]
+            # del self.trackers[i]
+
+        self.lifetime_container = [i for j, i in enumerate(self.lifetime_container) if j not in to_del]
+        self.boundaries = [i for j, i in enumerate(self.boundaries) if j not in to_del]
+        self.container = [i for j, i in enumerate(self.container) if j not in to_del]
+        self.trackers = [i for j, i in enumerate(self.trackers) if j not in to_del]
+
+        return [i.update(frame) for i in self.trackers]
+
+
+
+
+    def get_rank(self, img1, img2):
+        matches = self.flann.knnMatch(img1, img2, k=2)
+        good = 0
+        for m, n in matches:
+            if m.distance < 0.7 * n.distance:
+                good += 1
+
+        return good
+
+
 
 class FeatureHolder:
     def __init__(self):
@@ -101,6 +191,7 @@ class Delta:
             res = cv2.absdiff(res, self.container[i])
 
         return res
+
 
 
 def transform_perspective(img, pts):

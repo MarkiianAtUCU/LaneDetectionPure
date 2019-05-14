@@ -104,39 +104,6 @@ class FeatureContainer:
 
 
 
-class FeatureHolder:
-    def __init__(self):
-        self.features = None
-        self.sift = cv2.cv2.xfeatures2d.SIFT_create()
-        FLANN_INDEX_KDTREE = 0
-        index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
-        search_params = dict(checks=50)
-
-        self.flann = cv2.FlannBasedMatcher(index_params, search_params)
-
-
-    def check(self, new_img):
-        if self.features is None:
-            self.features = self.sift.detectAndCompute(new_img,None)[1]
-            return True
-
-        new_img_features = self.sift.detectAndCompute(new_img,None)[1]
-        matches = self.flann.knnMatch(self.features, new_img_features, k=2)
-        good = []
-        for m, n in matches:
-            if m.distance < 0.7 * n.distance:
-                good.append(m)
-        if len(good) > 6 :
-            self.features = new_img_features
-            return True
-        return False
-        # else:
-            # print
-            # "Not enough matches are found - %d/%d" % (len(good), MIN_MATCH_COUNT)
-            # matchesMask = None
-
-
-
 
 class Interpolator_ARR:
     def __init__(self, thresh):
@@ -192,7 +159,19 @@ class Delta:
 
         return res
 
+pts = np.float32([(580, 450), (705, 450), (200, 650), (1160, 650)])
+pts_python = [ (700, 435), (560, 435),(0, 650), (3200, 650)]
+pts2 = np.float32([[0, 0], [500, 0], [0, 500], [500, 500]])
+M = cv2.getPerspectiveTransform(pts, pts2)
 
+def convert(x, y):
+    return int((M[0][0] * x + M[0][1] * y + M[0][2]) / (M[2][0] * x + M[2][1] * y + M[2][2])), int(
+        (M[1][0] * x + M[1][1] * y + M[1][2]) / (M[2][0] * x + M[2][1] * y + M[2][2]))
+
+def convert_(x, y):
+    M_ = np.linalg.inv(M)
+    return int((M_[0][0] * x + M_[0][1] * y + M_[0][2]) / (M_[2][0] * x + M_[2][1] * y + M_[2][2])), int(
+        (M_[1][0] * x + M_[1][1] * y + M_[1][2]) / (M_[2][0] * x + M_[2][1] * y + M_[2][2]))
 
 def transform_perspective(img, pts):
     # rows, cols, ch = img.shape

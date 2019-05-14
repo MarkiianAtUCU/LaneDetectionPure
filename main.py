@@ -1,7 +1,7 @@
 from pipeline import *
 
 
-cap = cv2.VideoCapture("Test_video.mp4")
+cap = cv2.VideoCapture("Test_video2.mp4")
 fr = 25
 count = 0
 
@@ -27,16 +27,8 @@ pts = np.float32([(580, 450), (705, 450), (200, 650), (1160, 650)])
     #     break
 # pts = np.float32(pts_python)
 cars_cascade = cv2.CascadeClassifier("cars_cascade_3.xml")
-# OPENCV_OBJECT_TRACKERS = {
-#         "csrt": cv2.TrackerCSRT_create,
-#         "kcf": cv2.TrackerKCF_create,
-#         "boosting": cv2.TrackerBoosting_create,
-#         "mil": cv2.TrackerMIL_create,
-#         "tld": cv2.TrackerTLD_create,
-#         "medianflow": cv2.TrackerMedianFlow_create,
-#         "mosse": cv2.TrackerMOSSE_create
-#     }
-# tracker = OPENCV_OBJECT_TRACKERS["mosse"]()
+
+# tracker = cv2.TrackerMOSSE_create()
 
 # blank_image = np.zeros((500,2000,3), np.uint8)
 # initBB = None
@@ -50,7 +42,8 @@ inter_Y2 = Interpolator(500)
 inter_A = Interpolator(5, max_th=10)
 inter_B = Interpolator(5)
 
-left = Interpolator_ARR(30)
+left = Interpolator_ARR(10)
+right = Interpolator_ARR(10)
 while cap.isOpened():
     count += 1
     ret, frame = cap.read()
@@ -75,12 +68,12 @@ while cap.isOpened():
     #                       (0, 255, 0), 2)
     if ret:
 
-        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # cars = cars_cascade.detectMultiScale(gray, 1.1, 5, 0 | cv2.CASCADE_SCALE_IMAGE, (30, 30))
+        cars = cars_cascade.detectMultiScale(gray, 1.1, 5, 0 | cv2.CASCADE_SCALE_IMAGE, (30, 30))
 
-        # for (x, y, w, h) in cars:
-        #     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 255), 2)
+        for (x, y, w, h) in cars:
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 255), 2)
 
 
 
@@ -101,8 +94,13 @@ while cap.isOpened():
                 cv2.circle(processed_img, (int(X), int(Y)), int(R), (0,255,0), LINE_WIDTH)
             #
             else:
+                res = []
                 for i in range(0, 500, 20):
-                    cv2.circle(processed_img, (int(res_0[0](i)), int(i)),10, (255,0,0))
+                    res.append(res_0[0](i))
+                    res = left.compare(res)
+
+                for i in range(25):
+                    cv2.circle(processed_img, (int(res[i]), int(i*20)),10, (255,0,0))
             #     A = inter_A.compare(res_0[0][0])
             #     B = inter_B.compare( res_0[0][1])
             #     # print(A,B)
@@ -115,8 +113,13 @@ while cap.isOpened():
                 R = inter_R2.compare(res_1[0][1])
                 cv2.circle(processed_img, (int(X), int(Y)), int(R), (0, 255, 0), LINE_WIDTH)
             else:
+                res = []
                 for i in range(0, 500, 20):
-                    cv2.circle(processed_img, (int(res_1[0](i)), int(i)),10, (255,0,0))
+                    res.append(res_1[0](i))
+                    res = right.compare(res)
+
+                for i in range(25):
+                    cv2.circle(processed_img, (int(res[i]), int(i * 20)), 10, (255, 0, 0))
                 # cv2.line(processed_img, (0, int( res_1[0][1])), (1000, int( res_1[0][0]* 1000 + res_1[0][1] ) ), (255, 0, 0), LINE_WIDTH)
             #
 

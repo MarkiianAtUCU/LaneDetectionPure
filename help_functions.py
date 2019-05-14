@@ -4,8 +4,8 @@ import cv2
 import numpy as np
 from scipy import optimize, interp
 
-old = 0.75
-new = 0.25
+old = 0.9
+new = 0.1
 
 
 class Interpolator_ARR:
@@ -324,10 +324,9 @@ def get_best_fit(l):
         err_two = (y[i]-y_new_two)**2
         err_circle += err_one if err_one<err_two else err_two
 
-    print(err_circle, err_polynom)
     if err_circle < err_polynom-800:
         return circle, True
-    print("poly")
+
     return polynom, False
 
     # print(f"circle = {err_circle} line = {err_line} RES: {'circle' if err_circle<err_line else 'line'}")

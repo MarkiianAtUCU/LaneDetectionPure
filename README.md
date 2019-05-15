@@ -9,10 +9,11 @@ Main goal of this project was to detect and track road lane only with one camera
 * numpy
 * scipy
 
-###Detailed description
+### Detailed description
 Full description can be found <a href = "https://github.com/MarkiianAtUCU/LaneDetectionPure/blob/master/content/MatsyukPotapovBryliak.pdf">here</s>
 
 ### Pipeline
+##### Lane detectiion
 Original image
 <img src="https://github.com/MarkiianAtUCU/LaneDetectionPure/blob/master/content/img_0.png"/>
 1. Warp perspective to "bird-eye view"

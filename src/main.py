@@ -1,6 +1,7 @@
 from pipeline import *
 
-cap = cv2.VideoCapture("Test_video.mp4")
+cap = cv2.VideoCapture("./../tests/Test_video.mp4")
+
 cap.set(1, 100)
 
 count = 0
@@ -12,6 +13,13 @@ LINE_WIDTH = 25
 _, frame_0 = cap.read()
 mask = np.full((frame_0.shape[0], frame_0.shape[1]), 0, dtype=np.uint8)
 cv2.fillPoly(mask, [np.int32(pts_python)], 255)
+
+# bar_outer = cv2.imread("hud_top.png", cv2.IMREAD_UNCHANGED)
+# mask0 = bar_outer[:,:,3]
+# color_overlay = bar_outer[::2]
+
+# overlay = cv2.merge()
+
 
 inter_R = Interpolator(200)
 inter_X = Interpolator(300)
@@ -35,8 +43,9 @@ while cap.isOpened():
     HUD_text_list = []
     HUD_rectangle_list = []
     count += 1
-    print(f"[{count}]")
+    # print(f"[{count}]")
     ret, frame = cap.read()
+    # cv2.imshow("orig", frame)
     overlay = frame.copy()
     alpha = 0.4
 
@@ -49,7 +58,7 @@ while cap.isOpened():
     thr = cv2.bitwise_or(thr, thr, mask=mask)
     kernel = np.ones((4, 4), np.uint8)
     img_dilated = cv2.dilate(thr, kernel, iterations=4)
-    cv2.imshow("DIL", img_dilatedq)
+    # cv2.imshow("DIL", img_dilated)
     _,contours,_ = cv2.findContours(img_dilated, 1, 2)
     if contours:
         for cnt in contours:
@@ -66,12 +75,16 @@ while cap.isOpened():
             # TODO: car logo
             cv2.rectangle(overlay, (x, y), (x + w, y + h), (0, 0, 255) if dist< 10 else ((0,255,255 ) if dist < 13 else (0,255,0)), -1)
             HUD_text_list.append(("{0:.1f}m".format(dist), (x+2, y+h-5), cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,255), 2))
-            HUD_rectangle_list.append(((x, y), (x + w, y + h), (0, 0, 255) if dist< 10 else ((0,255,255 ) if dist < 13 else (0,255,0)), 2))
+            HUD_rectangle_list.append(((x, y), (x + w, y + h), (0, 0, 255) if dist < 10 else ((0,255,255 ) if dist < 13 else (0,255,0)), 2))
 
 
     if ret:
         l_points, r_points, processed_img = process(frame, pts)
-        cv2.imshow("Original", frame)
+        cv2.circle(processed_img, l_points[-1], 10, (255,255,255), 10)
+        cv2.circle(processed_img, r_points[-1], 10, (255,255,255), 10)
+        l, r = 165-l_points[1][0], r_points[1][0]-165
+        # print((1-l/(l+r))/2, (1 - r/(l+r))/2)
+        # cv2.imshow("Original", processed_img)
 
         # ROAD LANE DETECTION
         if l_points and r_points:
@@ -115,7 +128,7 @@ while cap.isOpened():
         blank_image = np.zeros((500, 500, 3), np.uint8)
         cv2.fillPoly(blank_image, [np.array(res_l+res_r[::-1], dtype=np.int32)], (255,0,0))
         dst = cv2.warpPerspective(blank_image, M, (1280, 720), cv2.INTER_LINEAR, cv2.WARP_INVERSE_MAP, cv2.BORDER_TRANSPARENT);
-        overlay = cv2.bitwise_and(overlay,overlay, mask=cv2.bitwise_not(dst[:, :, 0]))+dst
+        overlay = cv2.bitwise_and(overlay, overlay, mask=cv2.bitwise_not(dst[:, :, 0]))+dst
 
         image_result_HUD = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
 
@@ -139,23 +152,7 @@ while cap.isOpened():
             cv2.rectangle(image_result_HUD, *i)
 
         cv2.imshow("RES", image_result_HUD)
-        # back = transform_perspective_back(mask, pts)
-        # b_channel, g_channel, r_channel = cv2.split(frame)
-        # alpha = np.zeros(b_channel.shape, dtype=b_channel.dtype)
-        #
-        # infill_tr = transform_perspective_back(poly, pts)
-        #
-        # fram = cv2.merge([b_channel, g_channel, r_channel, alpha])
-        # fram = cv2.addWeighted(fram, 1, infill_tr, 0.4, 0)
-        # masked_lines = cv2.bitwise_and(fram, fram, mask=cv2.bitwise_not(back[:, :, 3])) + back
-        # r, g, b, _ = cv2.split(masked_lines)
-        # out.write(cv2.merge([r, g, b]))
-        # cv2.imshow('Frame', masked_lines)
-        # a, b, c = cv2.split(res)
-        # alpha = np.zeros(a.shape, dtype=a.dtype)
-        #
-        # res_4 = cv2.merge([a, b, c, alpha])
-        # cv2.imshow('Frame2', cv2.bitwise_and(res_4, res_4, mask=cv2.bitwise_not(mask[:, :, 3])) + mask)
+
         if cv2.waitKey(25) & 0xFF == ord('q'):
             break
 

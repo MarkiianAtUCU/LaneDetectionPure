@@ -6,7 +6,7 @@ from scipy import optimize, interp
 
 old = 0.9
 new = 0.1
-cars_cascade = cv2.CascadeClassifier("cars_cascade_3.xml")
+cars_cascade = cv2.CascadeClassifier("./../resources/cars_cascade_3.xml")
 
 class FeatureContainer:
     def __init__(self, lifetime, acquire):
